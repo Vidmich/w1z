@@ -2,7 +2,8 @@
     var namespace = 'w1z',
         propname = '_w1z_listeners';
 
-    var slice = Array.prototype.slice;
+    var hasOwn = Object.prototype.hasOwnProperty,
+        slice = Array.prototype.slice;
 
     var reCheck = /[\\\/\|\[\]\?\+\^\$\(\)]/,
         reClass1 = /\.([^\s.])/g,
@@ -13,7 +14,7 @@
 
     var stuff = {
         fire: function(type) {
-            if (!this.hasOwnProperty(propname))
+            if (!hasOwn.call(this, propname))
                 return this;
 
             type = String(type).trim();
@@ -41,7 +42,7 @@
 
             order = Number(order) || 0;
 
-            var list = this.hasOwnProperty(propname)
+            var list = hasOwn.call(this, propname)
                 ? this[propname]
                 : this[propname] = [];
 
@@ -102,7 +103,7 @@
         },
 
         off: function(type, listener) {
-            if (!this.hasOwnProperty(propname))
+            if (!hasOwn.call(this, propname))
                 return this;
 
             // if called without arguements than clear all listeners
@@ -128,7 +129,7 @@
 
     var space = function(o) {
         for (var key in stuff)
-            if (stuff.hasOwnProperty(key))
+            if (hasOwn.call(stuff, key))
                 o[key] = stuff[key];
 
         o[propname] = [];
