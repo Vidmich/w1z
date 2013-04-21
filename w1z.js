@@ -11,56 +11,6 @@
         reName = /(^|\s)([^\s\(\[]+)/g,
         reSpaces = /\s+/g;
 
-    function addListener(type, f, listener, order) {
-        if ("function" != typeof listener)
-            throw new TypeError('Incorrect listener');
-
-        type = String(type).trim();
-        if (reCheck.test(type))
-            throw new Error('Incorrect type');
-
-        order = Number(order) || 0;
-
-        var list = this.hasOwnProperty(propname)
-            ? this[propname]
-            : this[propname] = [];
-
-        f._type = type;
-        f._original = listener;
-        f._order = order;
-        f._done = false;
-
-        type = type.replace(reClass1, '|$1');
-        type = type.replace(reClass2, '(?:\\.(?:$1))*');
-        type = type.replace(reAny, '$1[^\\s.]*');
-        type = type.replace(reName, '$1(?:$2|\\*|)');
-
-        f._re = new RegExp('(?:^|\\s+)(?:' + type.replace(reSpaces, '|') + ')(?:\\s|$)');
-
-        var n = list.length;
-
-        if (!n || list[n-1]._order <= order) {
-            list.push(f);
-        } else if (order < list[0]._order) {
-            list.splice(0, 0, f);
-        } else {
-            var a = 0,
-                b = n;
-
-            while (a < b) {
-                var c = a + b >> 1;
-                if (order < list[c]._order)
-                    b = c;
-                else
-                    a = c+1;
-            }
-
-            list.splice(a, 0, f);
-        }
-
-        return this;
-    }
-
     var stuff = {
         fire: function(type) {
             if (!this.hasOwnProperty(propname))
@@ -70,6 +20,7 @@
             if (reCheck.test(type))
                 throw new Error('Incorrect type');
 
+            // make separate array to call to be sure that we can add more listeners safely
             var listeners = this[propname].filter(function(f) {
                 return f._re.test(type);
             });
@@ -80,8 +31,60 @@
             return this;
         },
 
+        _on: function(type, f, listener, order) {
+            if ("function" != typeof listener)
+                throw new TypeError('Incorrect listener');
+
+            type = String(type).trim();
+            if (reCheck.test(type))
+                throw new Error('Incorrect type');
+
+            order = Number(order) || 0;
+
+            var list = this.hasOwnProperty(propname)
+                ? this[propname]
+                : this[propname] = [];
+
+            f._type = type;
+            f._original = listener;
+            f._order = order;
+            f._done = false;
+
+            type = type.replace(reClass1, '|$1');
+            type = type.replace(reClass2, '(?:\\.(?:$1))*');
+            type = type.replace(reAny, '$1[^\\s.]*');
+            type = type.replace(reName, '$1(?:$2|\\*|)');
+
+            f._re = new RegExp('(?:^|\\s+)(?:' + type.replace(reSpaces, '|') + ')(?:\\s|$)');
+
+            var n = list.length;
+
+            // put new listener into listeners list accordingly it's order
+            if (!n || list[n-1]._order <= order) {
+                list.push(f);
+            } else if (order < list[0]._order) {
+                list.splice(0, 0, f);
+            } else {
+                var a = 0,
+                    b = n;
+
+                while (a < b) {
+                    var c = a + b >> 1;
+                    if (order < list[c]._order)
+                        b = c;
+                    else
+                        a = c+1;
+                }
+
+                list.splice(a, 0, f);
+            }
+
+            return this;
+
+        },
+
         on: function(type, listener, scope, order) {
-            return addListener.call(this, type, function() {
+            return this._on(type, function() {
                 listener.apply(scope || this, arguments);
             }, listener, order);
         },
@@ -95,13 +98,14 @@
                 listener.apply(scope || this, argumens);
             }
 
-            return addListener.call(this, type, f, listener, order);
+            return this._on(type, f, listener, order);
         },
 
         off: function(type, listener) {
             if (!this.hasOwnProperty(propname))
                 return this;
 
+            // if called without arguements than clear all listeners
             if (void 0 === type && void 0 === listener) {
                 this[propname] = [];
                 return this;
@@ -131,7 +135,12 @@
         return o;
     };
 
+    // make namespace object eventable right out of the box
     space(space);
-    space.stuff = stuff;
+
+    // put stuff object into namespace to allow simpe extending
+    space._stuff = stuff;
+
+    // export namespace into global space
     this[namespace] = space;
 }();
